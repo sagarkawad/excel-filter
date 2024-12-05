@@ -1,0 +1,3 @@
+([('Excel Filter Tool',
+   '/Users/sagzone/client-projects/police-station/dist/Excel Filter Tool',
+   'EXECUTABLE')],)
