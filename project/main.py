@@ -110,8 +110,6 @@ def filter_and_save(df, original_file_path):
     else:
         messagebox.showerror("Error", "Please add atleast one filter to continue!")
 
-    
- 
 
 # Modified load_excel function
 def load_excel():
@@ -124,6 +122,16 @@ def load_excel():
         try:
             df = pd.read_excel(file_path)
             
+            # Clear existing UI elements except the filters_frame and load_button
+            for widget in root.winfo_children():
+                if widget != filters_frame and widget != load_button and isinstance(widget, (tk.Label, tk.Text, tk.Button, tk.Frame)):
+                    widget.destroy()
+            
+            # Clear existing filter rows
+            for frame, _, _ in filter_rows:
+                frame.destroy()
+            filter_rows.clear()
+            
             success_label = tk.Label(root, text=f"Excel file loaded successfully: {os.path.basename(file_path)}")
             success_label.pack(pady=10)
             
@@ -131,6 +139,7 @@ def load_excel():
             text_widget.pack(pady=10)
             
             text_widget.insert(tk.END, df.to_string())
+            text_widget.configure(state='disabled')  # Make the text widget read-only
             
             # Add "Add Filter" button before adding the first row
             add_filter_btn = tk.Button(root, text="Add Filter", command=add_filter_row)
