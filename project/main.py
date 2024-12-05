@@ -108,7 +108,7 @@ def filter_and_save(df, original_file_path):
         messagebox.showinfo("Success", f"Filtered file saved as: {os.path.basename(new_file_path)}\n\n{preview_message}")
         return True
     else:
-        messagebox.showerror("Error", "No any filters applied!")
+        messagebox.showerror("Error", "Please add atleast one filter to continue!")
 
     
  
