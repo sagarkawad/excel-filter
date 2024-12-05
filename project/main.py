@@ -96,17 +96,22 @@ def filter_and_save(df, original_file_path):
     
     # Create new filename
     file_dir = os.path.dirname(original_file_path)
-    file_name = "_".join(filename_parts)
-    new_file_path = os.path.join(file_dir, f"{file_name}_filtered.xlsx")
+    if len(filename_parts) != 0:
+        file_name = "_".join(filename_parts)
+        new_file_path = os.path.join(file_dir, f"{file_name}_filtered.xlsx")
+        # Save filtered dataframe and show preview
+        filtered_df.to_excel(new_file_path, index=False)
     
-    # Save filtered dataframe and show preview
-    filtered_df.to_excel(new_file_path, index=False)
+        # Show preview of filtered data
+        preview_message = f"Filtered results ({len(filtered_df)} rows):\n\n"
+        preview_message += filtered_df.head().to_string()
+        messagebox.showinfo("Success", f"Filtered file saved as: {os.path.basename(new_file_path)}\n\n{preview_message}")
+        return True
+    else:
+        messagebox.showerror("Error", "No any filters applied!")
+
     
-    # Show preview of filtered data
-    preview_message = f"Filtered results ({len(filtered_df)} rows):\n\n"
-    preview_message += filtered_df.head().to_string()
-    messagebox.showinfo("Success", f"Filtered file saved as: {os.path.basename(new_file_path)}\n\n{preview_message}")
-    return True
+ 
 
 # Modified load_excel function
 def load_excel():
