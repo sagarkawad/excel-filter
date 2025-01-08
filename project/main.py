@@ -1,16 +1,35 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import os
+from PIL import Image, ImageTk  # Import Pillow for image handling
+import sys
+import subprocess
 
 # Create the main application window
 root = tk.Tk()
 root.title("Load Excel File Example")
 root.geometry("400x300")
 
+# Create a canvas to hold the background image
+canvas = tk.Canvas(root, width=100, height=100)
+canvas.pack(fill="none", expand=False)
+
+# Load the logo image
+logo_path = "assets/icon/navbarLogo.jpeg"
+if os.path.exists(logo_path):
+    logo_image = Image.open(logo_path)  # Use Pillow to open the image
+    logo_image = logo_image.resize((100, 100), Image.LANCZOS)  # Use LANCZOS instead of ANTIALIAS
+    logo_image = ImageTk.PhotoImage(logo_image)  # Convert to PhotoImage for Tkinter
+    # Create an image on the canvas
+    canvas.create_image(0, 0, anchor=tk.NW, image=logo_image)
+else:
+    messagebox.showerror("Error", f"Logo image not found at: {logo_path}")
+    logo_image = None  # Set to None or a default image if needed
+
 # Create a frame to hold all filter inputs
-filters_frame = tk.Frame(root)
-filters_frame.pack(pady=10)
+filters_frame = tk.Frame(root, bg='white')  # Set background color for the frame
+filters_frame.pack(pady=10)  # Use pack instead of place to ensure visibility
 
 # List to keep track of filter input rows
 filter_rows = []
@@ -56,7 +75,7 @@ def filter_and_save(df, original_file_path):
         column_name = column_entry.get().strip()
         filter_value = value_entry.get().strip()
 
-        print(f"\nProcessing filter: {column_name} = {filter_value}")
+        print(f"\nProcessing filter: {column_name} contains {filter_value}")
         
         if not column_name or not filter_value:
             continue
@@ -75,13 +94,13 @@ def filter_and_save(df, original_file_path):
                 filter_value = float(filter_value)
                 filtered_df = filtered_df[filtered_df[column_name] == filter_value]
             else:
-                # Handle string columns - convert both column and filter value to strings
-                filtered_df = filtered_df[filtered_df[column_name].astype(str).str.lower() == str(filter_value).lower()]
+                # Handle string columns - use str.contains for substring matching
+                filtered_df = filtered_df[filtered_df[column_name].astype(str).str.contains(str(filter_value), case=False, na=False)]
             
             print(f"Rows remaining after this filter: {len(filtered_df)}")
             
             if filtered_df.empty:
-                messagebox.showerror("Error", f"No matches found after applying filter: {column_name} = {filter_value}")
+                messagebox.showerror("Error", f"No matches found after applying filter: {column_name} contains {filter_value}")
                 return False
                 
         except ValueError as e:
@@ -94,25 +113,44 @@ def filter_and_save(df, original_file_path):
         messagebox.showerror("Error", "No rows found matching all filter criteria")
         return False
     
-    # Create new filename
-    file_dir = os.path.dirname(original_file_path)
-    if len(filename_parts) != 0:
-        file_name = "_".join(filename_parts)
-        new_file_path = os.path.join(file_dir, f"{file_name}_filtered.xlsx")
+    # Ask user for the location to save the file
+    save_file_path = filedialog.asksaveasfilename(
+        defaultextension=".xlsx",
+        filetypes=[("Excel files", "*.xlsx *.xls")],
+        initialfile="_".join(filename_parts) + "_filtered.xlsx"
+    )
+    
+    if save_file_path:
         # Save filtered dataframe and show preview
-        filtered_df.to_excel(new_file_path, index=False)
+        filtered_df.to_excel(save_file_path, index=False)
     
         # Show preview of filtered data
         preview_message = f"Filtered results ({len(filtered_df)} rows):\n\n"
         preview_message += filtered_df.head().to_string()
-        messagebox.showinfo("Success", f"Filtered file saved as: {os.path.basename(new_file_path)}\n\n{preview_message}")
+        messagebox.showinfo("Success", f"Filtered file saved as: {os.path.basename(save_file_path)}\n\n{preview_message}")
         return True
     else:
-        messagebox.showerror("Error", "Please add atleast one filter to continue!")
+        messagebox.showerror("Error", "File save operation was cancelled.")
+        return False
 
+# Function to open the Excel file
+def open_excel_file(file_path):
+    if os.name == 'nt':  # For Windows
+        os.startfile(file_path)
+    elif os.name == 'posix':  # For macOS and Linux
+        if sys.platform == 'darwin':  # macOS
+            subprocess.call(['open', file_path])
+        else:  # Linux
+            subprocess.call(['xdg-open', file_path])
 
-# Modified load_excel function
+# Function to handle double-click event on the Treeview
+def on_treeview_double_click(event):
+    item = tree.selection()  # Get the selected item
+    if item:  # Check if an item is selected
+        open_excel_file(file_path)  # Open the Excel file
+
 def load_excel():
+    global tree, file_path  # Declare tree and file_path as global to access in double-click function
     file_path = filedialog.askopenfilename(
         title="Open Excel File",
         filetypes=[("Excel files", "*.xlsx *.xls")]
@@ -124,7 +162,7 @@ def load_excel():
             
             # Clear existing UI elements except the filters_frame and load_button
             for widget in root.winfo_children():
-                if widget != filters_frame and widget != load_button and isinstance(widget, (tk.Label, tk.Text, tk.Button, tk.Frame)):
+                if widget != filters_frame and widget != load_button and isinstance(widget, (tk.Label, tk.Text, tk.Button, tk.Frame, ttk.Treeview)):
                     widget.destroy()
             
             # Clear existing filter rows
@@ -135,11 +173,36 @@ def load_excel():
             success_label = tk.Label(root, text=f"Excel file loaded successfully: {os.path.basename(file_path)}")
             success_label.pack(pady=10)
             
-            text_widget = tk.Text(root, height=20, width=80)
-            text_widget.pack(pady=10)
+            # Create a frame to hold the Treeview and scrollbars
+            tree_frame = tk.Frame(root)
+            tree_frame.pack(expand=True, fill='both', pady=10)
             
-            text_widget.insert(tk.END, df.to_string())
-            text_widget.configure(state='disabled')  # Make the text widget read-only
+            # Create a Treeview widget to display the DataFrame
+            tree = ttk.Treeview(tree_frame, columns=list(df.columns), show='headings')
+            tree.pack(side=tk.LEFT, expand=True, fill='both')
+            
+            # Create vertical scrollbar
+            vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+            vsb.pack(side=tk.RIGHT, fill='y')
+            tree.configure(yscrollcommand=vsb.set)
+            
+            # Create horizontal scrollbar
+            hsb = ttk.Scrollbar(root, orient="horizontal", command=tree.xview)
+            hsb.pack(fill='x')
+            tree.configure(xscrollcommand=hsb.set)
+            
+            # Set the column headings
+            for col in df.columns:
+                tree.heading(col, text=col)
+                tree.column(col, anchor='center')
+            
+            # Insert the data into the Treeview
+            for index, row in df.iterrows():
+                tree.insert("", "end", values=list(row))
+            
+            # Display the number of rows
+            row_count_label = tk.Label(root, text=f"Number of rows: {len(df)}")
+            row_count_label.pack(pady=5)
             
             # Add "Add Filter" button before adding the first row
             add_filter_btn = tk.Button(root, text="Add Filter", command=add_filter_row)
@@ -151,6 +214,9 @@ def load_excel():
             filter_button = tk.Button(root, text="Filter and Save", 
                                     command=lambda: filter_and_save(df, file_path))
             filter_button.pack(pady=5)
+
+            # Bind double-click event to the Treeview
+            tree.bind("<Double-1>", on_treeview_double_click)  # Bind double-click event
             
         except Exception as e:
             messagebox.showerror("Error", f"Error loading file: {str(e)}")
