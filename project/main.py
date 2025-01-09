@@ -5,6 +5,7 @@ import os
 from PIL import Image, ImageTk  # Import Pillow for image handling
 import sys
 import subprocess
+from threading import Timer  # Import Timer for splash screen delay
 
 # Create the main application window
 root = tk.Tk()
@@ -361,6 +362,20 @@ root.bind("<Control-MouseWheel>", zoom)
 # Button to load an Excel file
 load_button = tk.Button(root, text="Load Excel File", command=load_excel)
 load_button.pack(pady=10)
+
+# Function to create and show the splash screen
+def show_splash_screen():
+    splash_frame = tk.Frame(root, bg='white')  # Create a frame for the splash screen
+    splash_frame.pack(expand=True, fill='both')  # Fill the main window
+
+    splash_label = tk.Label(splash_frame, text="Welcome to Mumbai Police Cyber Security!", font=("Arial", 20))
+    splash_label.pack(expand=True)  # Center the label in the splash screen
+
+    # Set a timer to hide the splash screen after 3 seconds
+    Timer(3, lambda: splash_frame.pack_forget()).start()  # Change 3 to the desired duration in seconds
+
+# Call the splash screen function before starting the main loop
+show_splash_screen()
 
 # Start the main event loop
 root.mainloop()
