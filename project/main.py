@@ -368,11 +368,32 @@ def show_splash_screen():
     splash_frame = tk.Frame(root, bg='white')  # Create a frame for the splash screen
     splash_frame.pack(expand=True, fill='both')  # Fill the main window
 
-    splash_label = tk.Label(splash_frame, text="Welcome to Mumbai Police Cyber Security!", font=("Arial", 20))
-    splash_label.pack(expand=True)  # Center the label in the splash screen
+    # Load the splash image (JPG format)
+    splash_image_path = "assets/icon/splash_screen.jpg"  # Update with your JPG image path
+    print(f"Loading image from: {splash_image_path}")  # Debugging line
+    if os.path.exists(splash_image_path):
+        print("Image found, loading...")  # Debugging line
+        splash_image = Image.open(splash_image_path)  # Open the image
+        splash_image = splash_image.resize((1080, 480), Image.LANCZOS)  # Resize as needed
+        splash_photo = ImageTk.PhotoImage(splash_image)  # Convert to PhotoImage for Tkinter
+
+        # Create a label with the image
+        splash_label = tk.Label(splash_frame, image=splash_photo)  
+        splash_label.image = splash_photo  # Keep a reference to avoid garbage collection
+        splash_label.pack(expand=True)  # Center the image in the splash screen
+
+        # Create a loading bar
+        loading_bar = ttk.Progressbar(splash_frame, orient="horizontal", length=400, mode="indeterminate")
+        loading_bar.pack(pady=(10, 0))  # Add some padding above the bar
+        loading_bar.start()  # Start the loading animation
+
+    else:
+        print("Image not found!")  # Debugging line
+        splash_label = tk.Label(splash_frame, text="Welcome to Mumbai Police Cyber Security!", font=("Arial", 20))
+        splash_label.pack(expand=True)  # Center the label in the splash screen
 
     # Set a timer to hide the splash screen after 3 seconds
-    Timer(3, lambda: splash_frame.pack_forget()).start()  # Change 3 to the desired duration in seconds
+    Timer(3, lambda: (loading_bar.stop(), splash_frame.pack_forget())).start()  # Stop the loading bar and hide the splash screen
 
 # Call the splash screen function before starting the main loop
 show_splash_screen()
