@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, font
 import pandas as pd
 import os
 from PIL import Image, ImageTk  # Import Pillow for image handling
@@ -176,26 +176,28 @@ def load_excel():
             success_label = tk.Label(root, text=f"Excel file loaded successfully: {os.path.basename(file_path)}")
             success_label.pack(pady=10)
             
+            # Create a style for the Treeview
+            style = ttk.Style()
+            style.configure("Treeview", font=('TkDefaultFont', 14))  # Increased font size to 14
+            style.configure("Treeview.Heading", font=('TkDefaultFont', 14, 'bold'))  # Increased font size for headings
+
+            # Add border to the Treeview cells
+            style.configure("Treeview", bordercolor="black", borderwidth=1)  # Set border color and width
+            style.map("Treeview", bordercolor=[('selected', 'blue')])  # Optional: Change border color when selected
+
             # Create a frame to hold the Treeview and scrollbars
             tree_frame = tk.Frame(root)
             tree_frame.pack(expand=True, fill='both', pady=10)
             
-            # Create a style for the Treeview
-            style = ttk.Style()
-            style.configure("Treeview", font=('TkDefaultFont', 10))  # Set font to default
-            style.configure("Treeview.Heading", font=('TkDefaultFont', 10, 'bold'))  # Set font for headings
-
-            # Add border to the Treeview cells
-            style.configure("Treeview", bordercolor="black", borderwidth=1)  # Set border color and width
-
             # Create a Treeview widget to display the DataFrame
             tree = ttk.Treeview(tree_frame, columns=list(df.columns), show='headings')
             tree.pack(side=tk.LEFT, expand=True, fill='both')
 
-            # Set the column headings and widths
-            for col in df.columns:
-                tree.heading(col, text=col, anchor='center')  # Center the column headings
-                tree.column(col, anchor='center', width=100)  # Set a default width for columns
+           # Ensure df is defined and has columns
+            if df is not None and not df.empty:
+                for col in df.columns:
+                    tree.heading(col, text=col, anchor='center')  # Center the column headings
+                    tree.column(col, anchor='center', width=100)  # Set width to 300 pixels
 
             # Add horizontal and vertical scrollbars
             vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
@@ -206,21 +208,15 @@ def load_excel():
             hsb.pack(fill='x')
             tree.configure(xscrollcommand=hsb.set)
 
-            # Set the column headings
-            for col in df.columns:
-                tree.heading(col, text=col)
-                tree.column(col, anchor='center', width=100)  # Set a default width for columns
-            tree['show'] = 'headings'  # Show only headings, no empty first column
-            tree.configure(selectmode='browse')  # Allow single selection
-            
-            # Add grid lines
-            tree.tag_configure('grid')
+            # Add grid lines and borders for each cell
+            tree.tag_configure('grid')  # Set border width and style
             for i in range(len(df.columns)):
-                tree.column(i, width=100)  # Set width for each column
-            
+                
+                tree.column(i, width=300)  # Ensure width is set to 300 pixels for each column
+
             # Insert the data into the Treeview
             for index, row in df.iterrows():
-                tree.insert("", "end", values=list(row))
+                tree.insert("", "end", values=list(row))  # Apply grid tag for borders
             
             # Display the total number of rows
             row_count_label = tk.Label(root, text=f"Total number of rows: {len(df)}")
@@ -244,6 +240,11 @@ def load_excel():
             # Bind double-click event to the Treeview
             tree.bind("<Double-1>", on_treeview_double_click)  # Bind double-click event
             
+            # Determine the maximum width for each column based on the content
+            for i in range(len(df.columns)):
+                max_width = max(df[df.columns[i]].astype(str).map(len).max(), len(df.columns[i]))  # Get max width of content
+                tree.column(i, width=(max_width * 10) + 10)  # Set width based on content length (multiplied for better visibility)
+
         except Exception as e:
             messagebox.showerror("Error", f"Error loading file: {str(e)}")
 
