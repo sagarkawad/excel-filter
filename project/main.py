@@ -9,6 +9,7 @@ import subprocess
 # Create the main application window
 root = tk.Tk()
 root.title("Load Excel File Example")
+root.attributes('-fullscreen', True)  # Set the window to full screen
 root.geometry("400x300")
 
 # Create a canvas to hold the background image
@@ -72,15 +73,15 @@ def filter_and_save(df, original_file_path):
     print("Initial DataFrame shape:", filtered_df.shape)
     
     for _, column_entry, value_entry in filter_rows:
-        column_name = column_entry.get().strip()
-        filter_value = value_entry.get().strip()
+        column_name = column_entry.get().strip().lower()
+        filter_value = value_entry.get().strip().lower()
 
         print(f"\nProcessing filter: {column_name} contains {filter_value}")
         
         if not column_name or not filter_value:
             continue
             
-        if column_name not in df.columns:
+        if column_name not in df.columns.str.lower():
             messagebox.showerror("Error", f"Column '{column_name}' not found in the Excel file!")
             return False
         
@@ -90,12 +91,14 @@ def filter_and_save(df, original_file_path):
         
         try:
             if 'int' in column_type or 'float' in column_type:
-                # Handle numeric columns
+                # Handle numeric columns - check for exact match
                 filter_value = float(filter_value)
-                filtered_df = filtered_df[filtered_df[column_name] == filter_value]
+                filtered_df = filtered_df[filtered_df[column_name] == filter_value]  # Exact match
+                
             else:
                 # Handle string columns - use str.contains for substring matching
                 filtered_df = filtered_df[filtered_df[column_name].astype(str).str.contains(str(filter_value), case=False, na=False)]
+                
             
             print(f"Rows remaining after this filter: {len(filtered_df)}")
             
@@ -150,7 +153,7 @@ def on_treeview_double_click(event):
         open_excel_file(file_path)  # Open the Excel file
 
 def load_excel():
-    global tree, file_path  # Declare tree and file_path as global to access in double-click function
+    global tree, file_path, row_count_label  # Declare row_count_label as global
     file_path = filedialog.askopenfilename(
         title="Open Excel File",
         filetypes=[("Excel files", "*.xlsx *.xls")]
@@ -177,31 +180,50 @@ def load_excel():
             tree_frame = tk.Frame(root)
             tree_frame.pack(expand=True, fill='both', pady=10)
             
+            # Create a style for the Treeview
+            style = ttk.Style()
+            style.configure("Treeview", font=('TkDefaultFont', 10))  # Set font to default
+            style.configure("Treeview.Heading", font=('TkDefaultFont', 10, 'bold'))  # Set font for headings
+
+            # Add border to the Treeview cells
+            style.configure("Treeview", bordercolor="black", borderwidth=1)  # Set border color and width
+
             # Create a Treeview widget to display the DataFrame
             tree = ttk.Treeview(tree_frame, columns=list(df.columns), show='headings')
             tree.pack(side=tk.LEFT, expand=True, fill='both')
-            
-            # Create vertical scrollbar
+
+            # Set the column headings and widths
+            for col in df.columns:
+                tree.heading(col, text=col, anchor='center')  # Center the column headings
+                tree.column(col, anchor='center', width=100)  # Set a default width for columns
+
+            # Add horizontal and vertical scrollbars
             vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
             vsb.pack(side=tk.RIGHT, fill='y')
             tree.configure(yscrollcommand=vsb.set)
-            
-            # Create horizontal scrollbar
+
             hsb = ttk.Scrollbar(root, orient="horizontal", command=tree.xview)
             hsb.pack(fill='x')
             tree.configure(xscrollcommand=hsb.set)
-            
+
             # Set the column headings
             for col in df.columns:
                 tree.heading(col, text=col)
-                tree.column(col, anchor='center')
+                tree.column(col, anchor='center', width=100)  # Set a default width for columns
+            tree['show'] = 'headings'  # Show only headings, no empty first column
+            tree.configure(selectmode='browse')  # Allow single selection
+            
+            # Add grid lines
+            tree.tag_configure('grid')
+            for i in range(len(df.columns)):
+                tree.column(i, width=100)  # Set width for each column
             
             # Insert the data into the Treeview
             for index, row in df.iterrows():
                 tree.insert("", "end", values=list(row))
             
-            # Display the number of rows
-            row_count_label = tk.Label(root, text=f"Number of rows: {len(df)}")
+            # Display the total number of rows
+            row_count_label = tk.Label(root, text=f"Total number of rows: {len(df)}")
             row_count_label.pack(pady=5)
             
             # Add "Add Filter" button before adding the first row
@@ -210,6 +232,10 @@ def load_excel():
             
             # Add first filter row by default
             add_filter_row()
+
+            # Add "Check Filter" button at the bottom of the Excel file display
+            check_filter_btn = tk.Button(root, text="Check Filter", command=check_filters)
+            check_filter_btn.pack(pady=5)
             
             filter_button = tk.Button(root, text="Filter and Save", 
                                     command=lambda: filter_and_save(df, file_path))
@@ -220,6 +246,116 @@ def load_excel():
             
         except Exception as e:
             messagebox.showerror("Error", f"Error loading file: {str(e)}")
+
+def filter_displayed_rows():
+    global tree, file_path  # Ensure tree and file_path are accessible
+    if not file_path:
+        return  # No file loaded, exit the function
+
+    try:
+        df = pd.read_excel(file_path)  # Reload the DataFrame from the file
+        filtered_df = df.copy()
+
+        for _, column_entry, value_entry in filter_rows:
+            column_name = column_entry.get().strip().lower()  # Convert to lowercase
+            filter_value = value_entry.get().strip()
+
+            if not column_name or not filter_value:
+                continue
+            
+            # Ensure case-insensitive check for column names
+            lower_columns = [col.lower() for col in df.columns]  # Convert df.columns to lowercase
+            if column_name not in lower_columns:
+                messagebox.showerror("Error", f"Column '{column_name}' not found in the Excel file!")
+                return
+            
+            # Get the actual column name from the original DataFrame
+            actual_column_name = df.columns[lower_columns.index(column_name)]
+
+            # Filter logic
+            filtered_df = filtered_df[filtered_df[actual_column_name].astype(str).str.contains(filter_value, case=False, na=False)]
+
+        # Clear the Treeview
+        for item in tree.get_children():
+            tree.delete(item)
+
+        # Insert the filtered data into the Treeview
+        for index, row in filtered_df.iterrows():
+            tree.insert("", "end", values=list(row))
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Error filtering data: {str(e)}")
+
+# New function to check and display filtered results
+def check_filters():
+    global tree, file_path, row_count_label  # Declare row_count_label as global
+    if not file_path:
+        return  # No file loaded, exit the function
+
+    try:
+        df = pd.read_excel(file_path)  # Reload the DataFrame from the file
+        filtered_df = df.copy()
+
+        for _, column_entry, value_entry in filter_rows:
+            column_name = column_entry.get().strip().lower()
+            filter_value = value_entry.get().strip().lower()
+
+            if not column_name or not filter_value:
+                continue
+            
+            lower_columns = [col.lower() for col in df.columns]  # Convert df.columns to lowercase
+            if column_name not in lower_columns:
+                messagebox.showerror("Error", f"Column '{column_name}' not found in the Excel file!")
+                return
+            
+            actual_column_name = df.columns[lower_columns.index(column_name)]  # Get the actual column name
+
+            # Determine column type
+            column_type = str(filtered_df[actual_column_name].dtype)
+            
+            # Filter logic
+            if 'int' in column_type or 'float' in column_type:
+                # Handle numeric columns - check for exact match
+                try:
+                    filtered_df = filtered_df[filtered_df[actual_column_name] == float(filter_value)]  # Exact match
+                except ValueError:
+                    continue  # Skip if conversion fails
+            else:
+                # Handle string columns - use str.contains for substring matching
+                filtered_df = filtered_df[filtered_df[actual_column_name].astype(str).str.contains(filter_value, case=False, na=False)]
+
+        # Clear the Treeview
+        for item in tree.get_children():
+            tree.delete(item)
+
+        # Insert the filtered data into the Treeview
+        for index, row in filtered_df.iterrows():
+            tree.insert("", "end", values=list(row))
+
+        # Display the number of filtered rows
+        row_count_label.config(text=f"Total number of rows: {len(df)} | Filtered rows: {len(filtered_df)}")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Error filtering data: {str(e)}")
+
+# Function to handle zooming in and out
+def zoom(event):
+    global tree  # Ensure tree is accessible
+    current_font = tree.cget("font")
+    font_size = int(current_font.split()[1])  # Get current font size
+
+    if event.delta > 0:  # Zoom in
+        new_font_size = font_size + 2
+    else:  # Zoom out
+        new_font_size = max(8, font_size - 2)  # Prevent font size from going below 8
+
+    # Update the font size for the Treeview and its headings
+    new_font = (current_font.split()[0], new_font_size)
+    tree.configure(font=new_font)
+    style.configure("Treeview", font=new_font)  # Update Treeview style
+
+# Bind the zoom function to the mouse wheel event
+root.bind("<Control-MouseWheel>", zoom)
 
 # Button to load an Excel file
 load_button = tk.Button(root, text="Load Excel File", command=load_excel)
